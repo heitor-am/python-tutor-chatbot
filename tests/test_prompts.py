@@ -36,6 +36,13 @@ class TestSystemPrompt:
     def test_uses_markdown_code_blocks(self) -> None:
         assert "```python" in SYSTEM_PROMPT
 
+    def test_forbids_filler_opening_phrases(self) -> None:
+        # Claude Haiku tends to open responses with "Ótimo! Encontrei..."
+        # narration before the actual content — this leaks through the
+        # streaming buffer filter because it's part of the final AIMessage.
+        # Prompt-level instruction is the right place to fix it.
+        assert "Não comece a resposta com frases de abertura" in SYSTEM_PROMPT
+
     @pytest.mark.parametrize("rule_id", ["1.", "2.", "3.", "4.", "5.", "6.", "7.", "8."])
     def test_eight_numbered_rules_present(self, rule_id: str) -> None:
         assert rule_id in SYSTEM_PROMPT

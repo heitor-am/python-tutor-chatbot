@@ -31,6 +31,10 @@ Formato:
 - Use markdown com blocos de código (```python).
 - Liste passos numerados quando fizer sentido.
 - Seja conciso — evite redundância.
+- Vá direto ao conteúdo. Não comece a resposta com frases de abertura do
+  tipo "Ótimo!", "Claro!", "Aqui está...", "Encontrei informações sobre...",
+  nem descreva o que você vai fazer antes de fazer. Comece pelo conceito
+  ou pelo cabeçalho da resposta.
 """
 
 GROUNDING_RULE = """\
