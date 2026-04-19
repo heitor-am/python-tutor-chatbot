@@ -83,10 +83,12 @@ async def on_message(message: cl.Message) -> None:
     thread_id = cl.user_session.get("thread_id")
 
     response = cl.Message(content="")
-    # Chainlit's LangChain callback handler surfaces the agent's tool calls
-    # as Steps in the sidebar (search query + result). We rely on these for
-    # user feedback during the buffering window below.
-    callback = cl.LangchainCallbackHandler()
+    # Chainlit's LangChain callback handler emits a Step per Runnable by
+    # default — that includes the "LangGraph" graph wrapper, each "model"
+    # call, and each tool invocation, with the model calls dumping the
+    # full message history as JSON. Whitelisting via `to_keep` to the one
+    # step that has user-visible signal: the `tavily_search` tool call.
+    callback = cl.LangchainCallbackHandler(to_keep=["tavily_search"])
 
     # Buffer content tokens per `message.id`. If any chunk of a given
     # message id carries `tool_call_chunks`, that id is intermediate
