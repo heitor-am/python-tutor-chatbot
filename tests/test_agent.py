@@ -23,6 +23,24 @@ def _fake_model(replies: list[str]) -> FakeMessagesListChatModel:
     return FakeMessagesListChatModel(responses=[AIMessage(content=r) for r in replies])
 
 
+@pytest.fixture(autouse=True)
+def _no_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default to grounding off for every test in this module.
+
+    Tests that need tools=[TavilySearch] override `tools_module.get_settings`
+    explicitly. Without this fixture, a developer machine with TAVILY_API_KEY
+    in `.env` would pick up real tools and fail the FakeChatModel-based
+    tests with NotImplementedError (the fake doesn't support tool binding).
+    """
+    from app import tools as tools_module
+
+    monkeypatch.setattr(
+        tools_module,
+        "get_settings",
+        lambda: Settings(_env_file=None, tavily_api_key=""),  # type: ignore[call-arg]
+    )
+
+
 class TestBuildAgent:
     def test_construct_with_injected_model_does_not_hit_network(self) -> None:
         # If construction tried to call OpenRouter (no API key set), this
@@ -117,10 +135,13 @@ class TestSystemPromptToggle:
 
     def test_with_grounding_false_when_no_tavily_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app import agent as agent_module
-        from app.config import get_settings
+        from app import tools as tools_module
 
-        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-        get_settings.cache_clear()
+        monkeypatch.setattr(
+            tools_module,
+            "get_settings",
+            lambda: Settings(_env_file=None, tavily_api_key=""),  # type: ignore[call-arg]
+        )
 
         captured: dict[str, bool] = {}
 
@@ -134,10 +155,13 @@ class TestSystemPromptToggle:
 
     def test_with_grounding_true_when_tavily_key_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app import agent as agent_module
-        from app.config import get_settings
+        from app import tools as tools_module
 
-        monkeypatch.setenv("TAVILY_API_KEY", "tvly-fake-key-for-test")
-        get_settings.cache_clear()
+        monkeypatch.setattr(
+            tools_module,
+            "get_settings",
+            lambda: Settings(_env_file=None, tavily_api_key="tvly-fake-key-for-test"),  # type: ignore[call-arg]
+        )
 
         captured: dict[str, bool] = {}
 
