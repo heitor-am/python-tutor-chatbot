@@ -38,6 +38,12 @@ RUN useradd --system --create-home --shell /bin/bash app
 
 COPY --from=builder --chown=app:app /app /app
 
+# WORKDIR creates /app as root before the COPY; --chown sets ownership
+# on the copied files but leaves the parent dir root-owned. Chainlit
+# writes runtime artifacts into ./.files at startup, so the workdir
+# itself has to be writable by the runtime user.
+RUN chown app:app /app
+
 USER app
 
 EXPOSE 8000
