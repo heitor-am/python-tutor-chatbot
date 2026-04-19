@@ -1,13 +1,9 @@
-"""Scaffold-stage smoke tests.
+"""Scaffold-level smoke: settings, logging, exception hierarchy, and the
+chat-model factory. Real agent / prompt coverage lives in `test_agent.py`
+and `test_prompts.py`.
 
-Block 2 will replace these with real coverage of agent / prompt logic.
-For now they exercise enough of the scaffold modules to keep the
-coverage gate (80% via pyproject.toml) honest — no skipped lines hiding
-under a low bar.
-
-Tests build `Settings` directly (instead of going through the cached
-`get_settings()` + .env) so cases stay independent and don't leak
-into each other via the `lru_cache`.
+Tests build `Settings` directly (or override `client_module.get_settings`)
+so cases stay independent and don't leak via the `lru_cache`.
 """
 
 from __future__ import annotations
@@ -30,6 +26,7 @@ def test_settings_default_values_match_pkg_intent() -> None:
     assert s.openrouter_chat_model == "anthropic/claude-haiku-4.5"
     assert s.openrouter_app_name == "Python Tutor Chatbot"
     assert s.environment == "development"
+    assert s.tavily_api_key == ""
 
 
 def test_settings_cache_returns_same_instance() -> None:
@@ -43,9 +40,6 @@ def test_logging_configures_in_dev(monkeypatch: pytest.MonkeyPatch) -> None:
         "get_settings",
         lambda: Settings(_env_file=None, environment="development"),  # type: ignore[call-arg]
     )
-    # Calling configure_logging twice exercises both caching and the
-    # processor-list construction; explicit assertion would mock structlog,
-    # which buys nothing for a smoke test.
     configure_logging()
 
 
@@ -56,26 +50,32 @@ def test_logging_configures_in_prod(monkeypatch: pytest.MonkeyPatch) -> None:
     configure_logging()
 
 
-def test_openrouter_client_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chat_model_factory_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         client_module,
         "get_settings",
         lambda: Settings(_env_file=None, openrouter_api_key=""),  # type: ignore[call-arg]
     )
     with pytest.raises(LLMUnavailableError, match="OPENROUTER_API_KEY"):
-        client_module.get_openrouter_client()
+        client_module.get_openrouter_chat_model()
 
 
-def test_openrouter_client_returns_client_when_key_set(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chat_model_factory_returns_chatopenai_when_key_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         client_module,
         "get_settings",
         lambda: Settings(_env_file=None, openrouter_api_key="sk-test"),  # type: ignore[call-arg]
     )
-    client = client_module.get_openrouter_client()
-    assert client.api_key == "sk-test"
+    model = client_module.get_openrouter_chat_model()
+    # Headers and base_url are wired through so OpenRouter sees the right app.
+    assert model.openai_api_base == "https://openrouter.ai/api/v1"
+    assert model.default_headers == {
+        "HTTP-Referer": "http://localhost:8000",
+        "X-Title": "Python Tutor Chatbot",
+    }
 
 
 def test_exception_hierarchy() -> None:
-    # LLMUnavailableError is an AppError so handlers can catch the base.
     assert issubclass(LLMUnavailableError, AppError)
