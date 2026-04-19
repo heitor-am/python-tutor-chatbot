@@ -18,7 +18,7 @@ from app.core.logging import configure_logging
 
 
 def test_package_exposes_version() -> None:
-    assert app.__version__ == "0.1.0"
+    assert app.__version__ == "1.0.0"
 
 
 def test_settings_default_values_match_pkg_intent() -> None:
