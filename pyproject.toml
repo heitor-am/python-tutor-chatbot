@@ -65,6 +65,15 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 
+# Chainlit's public surface (cl.user_session, cl.Message, decorators) is
+# largely untyped. We enforce strict typing on our own code but allow
+# untyped calls *into* the framework from the entry-point module that
+# wraps it. This stays scoped to one file so we don't lose strictness
+# anywhere else.
+[[tool.mypy.overrides]]
+module = "app.main"
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
