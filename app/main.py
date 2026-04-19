@@ -9,12 +9,20 @@ Each browser session gets its own `build_agent()` instance + a stable
   `ChatOpenAI` constructor is cheap (no network on construction) so the
   cost is negligible.
 
-Streaming: `agent.astream(stream_mode="messages")` yields
-`(BaseMessage, metadata)` tuples for each LLM token chunk. We forward
-the chunk content to `cl.Message.stream_token()` so the UI renders
-tokens as they arrive. The `cl.AsyncLangchainCallbackHandler` is passed
-as a callback so Chainlit shows the LLM call as a visible Step in the
-sidebar.
+Streaming strategy (`on_message`):
+    `agent.astream(stream_mode="messages")` yields `(BaseMessage, metadata)`
+    tuples for each LLM token chunk. In a tool-calling agent the model is
+    invoked *multiple times*: once per tool round plus a final answer.
+    Intermediate model calls emit their own content (reasoning like "vou
+    buscar mais detalhes…") before producing `tool_call_chunks`, and we do
+    NOT want that content in the user-facing bubble.
+
+    We buffer content chunks per `message.id` and, once the stream is done,
+    flush only the final message — i.e. the one whose chunks never carried
+    `tool_call_chunks`. Emission is via `cl.Message.stream_token()` so the
+    UI still gets the typewriter effect, just delayed until after the tool
+    rounds finish (users see the Chainlit Step progress in the sidebar
+    during that window — same UX as Claude.ai / ChatGPT tool use).
 
 Errors from the LLM provider (rate limit, timeout, transient 5xx) are
 caught and surfaced as a friendly message in the chat — never as a
@@ -75,7 +83,18 @@ async def on_message(message: cl.Message) -> None:
     thread_id = cl.user_session.get("thread_id")
 
     response = cl.Message(content="")
-    callback = cl.AsyncLangchainCallbackHandler()
+    # Chainlit's LangChain callback handler surfaces the agent's tool calls
+    # as Steps in the sidebar (search query + result). We rely on these for
+    # user feedback during the buffering window below.
+    callback = cl.LangchainCallbackHandler()
+
+    # Buffer content tokens per `message.id`. If any chunk of a given
+    # message id carries `tool_call_chunks`, that id is intermediate
+    # reasoning (the model announcing its next tool call, e.g. "vou buscar
+    # mais detalhes") — drop its buffer. Otherwise the id represents the
+    # final answer and we flush it.
+    buffers: dict[str, list[str]] = {}
+    tool_calling_ids: set[str] = set()
 
     try:
         async for chunk, _metadata in agent.astream(
@@ -86,11 +105,18 @@ async def on_message(message: cl.Message) -> None:
             },
             stream_mode="messages",
         ):
-            # Skip non-AI chunks (tool messages, system) — only assistant
-            # tokens go to the user-facing bubble.
-            if isinstance(chunk, AIMessageChunk) and chunk.content:
-                content = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
-                await response.stream_token(content)
+            if not isinstance(chunk, AIMessageChunk):
+                continue
+            msg_id = chunk.id or "default"
+            if chunk.tool_call_chunks:
+                tool_calling_ids.add(msg_id)
+                buffers.pop(msg_id, None)
+                continue
+            if msg_id in tool_calling_ids:
+                continue
+            if chunk.content:
+                text = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
+                buffers.setdefault(msg_id, []).append(text)
     except _FRIENDLY_LLM_ERRORS as exc:
         # Log the structured error for debugging; show the user something
         # actionable instead of an exception trace in the chat bubble.
@@ -99,6 +125,16 @@ async def on_message(message: cl.Message) -> None:
             "⚠️ Não consegui responder agora — o serviço de LLM retornou um erro temporário "
             "(rate limit, timeout ou indisponibilidade). Tente novamente em alguns segundos."
         )
+        await response.send()
+        return
+
+    # Flush every buffered final-answer message token-by-token so the UI
+    # still renders with a typewriter cadence.
+    for msg_id, buffer in buffers.items():
+        if msg_id in tool_calling_ids:
+            continue
+        for token in buffer:
+            await response.stream_token(token)
 
     await response.send()
 
