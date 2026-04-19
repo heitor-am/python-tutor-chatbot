@@ -21,6 +21,7 @@ from collections.abc import Sequence
 
 from langchain_core.tools import BaseTool
 from langchain_tavily import TavilySearch
+from pydantic import SecretStr
 
 from app.config import get_settings
 
@@ -31,6 +32,11 @@ def build_tools() -> Sequence[BaseTool]:
     Empty when `TAVILY_API_KEY` is not configured — `app.agent.build_agent`
     branches on `bool(build_tools())` to decide whether to append the
     grounding rule to the system prompt.
+
+    The key is passed explicitly because `TavilySearch` reads only from
+    `os.environ`, not from our pydantic-settings layer. With `.env`-loaded
+    settings (local dev) the env var isn't promoted to `os.environ`, so
+    relying on Tavily's auto-discovery would silently break local smoke.
     """
     settings = get_settings()
     if not settings.tavily_api_key:
@@ -40,5 +46,6 @@ def build_tools() -> Sequence[BaseTool]:
             max_results=3,
             include_answer="basic",
             search_depth="basic",
+            tavily_api_key=SecretStr(settings.tavily_api_key),
         )
     ]
