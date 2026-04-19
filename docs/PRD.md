@@ -51,9 +51,9 @@ Architectural weight in the portfolio sits with the REST API project (Q1, backen
 - **Friendly error messages** in the chat (instead of stack traces) when the LLM provider hiccups
 - **Public deploy** to Fly.io (same pattern as the sibling repos)
 
-### 2.3 Optional differentiator (planned)
+### 2.3 Optional differentiator (delivered)
 
-- **Grounding via Tavily web search** — `tools=[TavilySearch(...)]` on `create_agent` so the tutor can verify version-specific Python APIs before answering. Opt-in via `TAVILY_API_KEY`; agent degrades gracefully without the key.
+- **Grounding via Tavily web search** — `tools=[TavilySearch(...)]` on `create_agent` so the tutor can verify version-specific Python APIs before answering. Opt-in via `TAVILY_API_KEY`; agent degrades gracefully without the key. ADR-006 covers the trade vs DuckDuckGo / context7 / RAG over `docs.python.org`.
 
 ### 2.4 Out of scope
 

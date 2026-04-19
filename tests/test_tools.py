@@ -1,13 +1,15 @@
 """Tests for the tool factory.
 
-Block 4.5 will add the Tavily branch; for now both branches return `[]`,
-but the env-var coupling is what we lock in here so the future upgrade
-doesn't need to re-introduce the test scaffolding.
+Two branches: no `TAVILY_API_KEY` → `[]` (pure-LLM mode), key set → a
+single `TavilySearch` tool. Tests don't make network calls — `TavilySearch`
+construction reads the env var but doesn't hit the API until the LLM
+actually invokes the tool.
 """
 
 from __future__ import annotations
 
 import pytest
+from langchain_tavily import TavilySearch
 
 from app.config import get_settings
 from app.tools import build_tools
@@ -19,12 +21,21 @@ class TestBuildTools:
         get_settings.cache_clear()
         assert build_tools() == []
 
-    def test_returns_empty_when_tavily_key_set_but_grounding_not_wired_yet(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # Setting the key today still returns [] — Block 4.5 will replace
-        # this with a non-empty list. Locking the current behaviour so the
-        # upgrade lands as a deliberate code change, not a silent feature.
+    def test_returns_tavily_search_when_key_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("TAVILY_API_KEY", "tvly-fake-key-for-test")
         get_settings.cache_clear()
-        assert build_tools() == []
+        tools = build_tools()
+        assert len(tools) == 1
+        assert isinstance(tools[0], TavilySearch)
+        # Configured to keep the payload small — see app/tools.py rationale.
+        assert tools[0].max_results == 3
+        assert tools[0].include_answer == "basic"
+
+    def test_grounding_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Belt-and-suspenders: `app.agent.build_agent` reads `bool(build_tools())`
+        # to decide whether to append rule 9 to the system prompt. If this
+        # default ever flips, the prompt would lie to the model — assert it
+        # explicitly here so the regression shows up at PR time.
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+        get_settings.cache_clear()
+        assert not build_tools()

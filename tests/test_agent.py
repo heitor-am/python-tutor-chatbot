@@ -104,3 +104,47 @@ class TestThreadMemory:
         # Thread A must not see thread B's user message and vice-versa.
         assert "From A" in contents_a and "From B" not in contents_a
         assert "From B" in contents_b and "From A" not in contents_b
+
+
+class TestSystemPromptToggle:
+    """`build_agent` must pass `with_grounding=True` to the system-prompt
+    builder iff `build_tools()` returns tools. Otherwise we'd instruct
+    the model to call a tool that doesn't exist (silent behavioural bug).
+
+    Spies on `build_system_prompt` so we don't depend on whether
+    `create_agent` exposes the system prompt via state inspection.
+    """
+
+    def test_with_grounding_false_when_no_tavily_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app import agent as agent_module
+        from app.config import get_settings
+
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+        get_settings.cache_clear()
+
+        captured: dict[str, bool] = {}
+
+        def spy(*, with_grounding: bool) -> str:
+            captured["with_grounding"] = with_grounding
+            return "system prompt"
+
+        monkeypatch.setattr(agent_module, "build_system_prompt", spy)
+        build_agent(model=_fake_model(["x"]), checkpointer=InMemorySaver())
+        assert captured == {"with_grounding": False}
+
+    def test_with_grounding_true_when_tavily_key_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app import agent as agent_module
+        from app.config import get_settings
+
+        monkeypatch.setenv("TAVILY_API_KEY", "tvly-fake-key-for-test")
+        get_settings.cache_clear()
+
+        captured: dict[str, bool] = {}
+
+        def spy(*, with_grounding: bool) -> str:
+            captured["with_grounding"] = with_grounding
+            return "system prompt"
+
+        monkeypatch.setattr(agent_module, "build_system_prompt", spy)
+        build_agent(model=_fake_model(["x"]), checkpointer=InMemorySaver())
+        assert captured == {"with_grounding": True}

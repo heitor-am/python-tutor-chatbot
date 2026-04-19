@@ -44,7 +44,7 @@ Or just hit production: <https://python-tutor-chatbot.fly.dev>. Fly auto-stops t
 | **Memory** | LangGraph `InMemorySaver` + per-session `thread_id` | Tabs are isolated; no DB needed for this single-instance demo |
 | **LLM gateway** | OpenRouter via `langchain-openai`'s `ChatOpenAI` (custom `base_url`) | One key across the portfolio (ADR-002) |
 | **Default chat model** | `anthropic/claude-haiku-4.5` | Best PT-BR fidelity on the smoke set at this price point (ADR-003) |
-| **Grounding (optional)** | Tavily web search via `langchain-tavily` | Opt-in via `TAVILY_API_KEY`; agent degrades gracefully without it. Wires in as `tools=[TavilySearch(...)]` on `create_agent`. |
+| **Grounding (optional)** | Tavily web search via `langchain-tavily` | Opt-in via `TAVILY_API_KEY`. When set, the agent gets `tools=[TavilySearch(...)]` and the system prompt picks up rule 9 ("verify version-specific APIs before answering"). Without the key, agent runs pure-LLM and rule 9 is dropped — the prompt never lies about what the agent can do. ADR-006. |
 | **Quality** | Ruff · mypy strict · pytest (≥ 80% gate, currently 100%) · pip-audit · bandit | All enforced in CI |
 | **Infra** | Docker (multi-stage) · Fly.io · GitHub Actions | Auto-deploy on push to `main` (ADR-004) |
 
