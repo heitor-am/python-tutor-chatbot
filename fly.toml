@@ -1,0 +1,33 @@
+app = "python-tutor-chatbot"
+primary_region = "gru"
+
+[build]
+
+[env]
+  ENVIRONMENT = "production"
+  LOG_LEVEL = "INFO"
+  OPENROUTER_APP_NAME = "Python Tutor Chatbot"
+  OPENROUTER_APP_URL = "https://python-tutor-chatbot.fly.dev"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # Auto-stop saves money on idle; cold-start cost on a single Chainlit
+  # process is ~2-3s, acceptable for a demo. Bump min_machines_running
+  # to 1 (~$2/mo) if a smoother first message matters.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[http_service.checks]]
+  grace_period = "15s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/"
