@@ -9,6 +9,7 @@ Each file documents one architectural choice: the context that forced the decisi
 | [003](003-claude-haiku-default-model.md) | Claude Haiku 4.5 as the default chat model |
 | [004](004-flyio-over-huggingface-spaces.md) | Fly.io over Hugging Face Spaces for the public deploy |
 | [005](005-create_agent-over-lcel-runnable.md) | `create_agent` over the legacy LCEL + `RunnableWithMessageHistory` pattern |
+| [006](006-grounding-via-tavily-search.md) | Grounding via Tavily web search (optional, opt-in via `TAVILY_API_KEY`) |
 
 ## When to add a new ADR
 
