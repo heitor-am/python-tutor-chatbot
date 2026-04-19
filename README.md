@@ -6,16 +6,54 @@
 
 Conversational Python tutor — Chainlit UI on top of LangChain `create_agent` + OpenRouter.
 
-**Scaffold stage (`v0.0.1`).** The agent, UI, deploy, and tests land in upcoming releases; what's here right now is the package layout, the OpenRouter client, and the CI pipeline.
+**`v0.1.0` — MVP.** The chat works end-to-end: streaming responses, per-session memory, three suggested starters, thumbs up / down feedback, and graceful refusal of off-topic questions. Deploy + extended documentation land in `v1.0.0`.
 
-## Stack (planned)
+## Quickstart
 
-- **UI:** Chainlit (chat-native, streaming + history + feedback out of the box)
-- **Orchestration:** LangChain `create_agent` (modern pattern; orchestrates via LangGraph internally with `InMemorySaver` for thread-based memory)
-- **LLM gateway:** OpenRouter — chat default `anthropic/claude-haiku-4.5`
-- **Optional grounding:** Tavily web search via `langchain-tavily` (opt-in, agent degrades gracefully without the key)
-- **Quality:** Ruff · mypy strict · pytest (≥ 80% coverage gate) · pip-audit · bandit
-- **Infra:** Docker (multi-stage) · Fly.io · GitHub Actions
+```bash
+git clone git@github.com:heitor-am/python-tutor-chatbot.git
+cd python-tutor-chatbot
+uv sync --all-extras
+
+cp .env.example .env
+# edit .env and set OPENROUTER_API_KEY=sk-or-...
+
+make dev
+# open http://localhost:8000
+```
+
+## Stack
+
+| Layer | Choice | Notes |
+|---|---|---|
+| **UI** | Chainlit 2.x | Chat-native; streaming + history + feedback widgets out of the box |
+| **Orchestration** | LangChain `create_agent` | Current canonical pattern from the LangChain docs (orchestrates via LangGraph internally; `RunnableWithMessageHistory` is legacy and absent from the docs) |
+| **Memory** | LangGraph `InMemorySaver` | Per-session `thread_id` keeps each browser tab isolated |
+| **LLM gateway** | OpenRouter | Default chat model: `anthropic/claude-haiku-4.5` |
+| **Grounding (optional)** | Tavily web search via `langchain-tavily` | Opt-in via `TAVILY_API_KEY`; agent degrades gracefully without it (planned for the next release) |
+| **Quality** | Ruff · mypy strict · pytest (≥ 80% coverage) · pip-audit · bandit | All enforced in CI |
+| **Infra** | Docker multi-stage · Fly.io · GitHub Actions | Deploy lands in `v1.0.0` |
+
+## Project layout
+
+```
+app/
+├── main.py        # Chainlit handlers (@cl.on_chat_start, @cl.on_message, @cl.on_feedback)
+├── agent.py       # build_agent() — create_agent + InMemorySaver + system prompt
+├── prompts/
+│   └── tutor.py   # SYSTEM_PROMPT (PT-BR persona, 8 rules)
+├── tools.py       # build_tools() — empty by default, returns Tavily when TAVILY_API_KEY is set
+├── ai/client.py   # ChatOpenAI pointed at OpenRouter
+├── config.py      # pydantic-settings
+└── core/          # logging, exceptions
+tests/             # 31 tests, 100% coverage on app/
+```
+
+## Tests
+
+```bash
+make check     # lint + typecheck + tests with coverage
+```
 
 ## Related repos
 
