@@ -21,7 +21,6 @@ from collections.abc import Sequence
 
 from langchain_core.tools import BaseTool
 from langchain_tavily import TavilySearch
-from pydantic import SecretStr
 
 from app.config import get_settings
 
@@ -37,6 +36,12 @@ def build_tools() -> Sequence[BaseTool]:
     `os.environ`, not from our pydantic-settings layer. With `.env`-loaded
     settings (local dev) the env var isn't promoted to `os.environ`, so
     relying on Tavily's auto-discovery would silently break local smoke.
+
+    Passed as a raw string, **not** wrapped in `SecretStr` — the `TavilySearch`
+    constructor applies its own `SecretStr` wrap internally, so double-wrapping
+    produces a `SecretStr(SecretStr(...))` whose `get_secret_value()` returns
+    the literal `'**********'` mask and the API call fails with HTTP 401
+    "missing or invalid API key".
     """
     settings = get_settings()
     if not settings.tavily_api_key:
@@ -46,6 +51,6 @@ def build_tools() -> Sequence[BaseTool]:
             max_results=3,
             include_answer="basic",
             search_depth="basic",
-            tavily_api_key=SecretStr(settings.tavily_api_key),
+            tavily_api_key=settings.tavily_api_key,
         )
     ]
